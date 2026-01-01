@@ -3,189 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>مجمع نبض الطبي - الحجز الذكي</title>
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <title>مجمع نبض الطبي - حجز موعد</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --danger: #e74c3c; --bg: #f4f7f6; --success: #27ae60; }
-        body { font-family: 'Cairo', sans-serif; background: var(--bg); margin: 0; padding: 0; }
-        .header { background: var(--primary); color: white; padding: 20px; text-align: center; }
-        .container { max-width: 500px; margin: auto; padding: 15px; }
-        
-        #near-alert { display: none; background: #f1c40f; color: #2c3e50; padding: 15px; border-radius: 12px; margin-bottom: 15px; text-align: center; font-weight: bold; animation: pulse 2s infinite; }
-        @keyframes pulse { 0% {opacity: 1;} 50% {opacity: 0.7;} 100% {opacity: 1;} }
-
-        .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin-bottom: 20px; }
-        .doc-info-box { display: none; background: #eefaff; padding: 15px; border-radius: 15px; margin: 15px 0; border-right: 5px solid var(--accent); font-size: 14px; }
-        #manage-booking { display: none; border: 2px dashed var(--danger); text-align: center; }
-        
-        label { display: block; margin-top: 10px; font-weight: bold; }
-        select, input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #ddd; font-family: 'Cairo'; box-sizing: border-box; }
-        
-        .flex-row { display: flex; gap: 10px; }
-        .flex-row div { flex: 1; }
-
-        button { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--accent); color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; }
-        .btn-cancel { background: var(--danger); margin-top: 10px; }
-        button:disabled { background: #ccc; cursor: not-allowed; }
-        
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .stat-item { background: #f8f9fa; padding: 10px; border-radius: 10px; text-align: center; }
-        .stat-val { display: block; font-size: 22px; font-weight: bold; color: var(--primary); }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f4f7f6; margin: 0; padding: 20px; text-align: center; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        h1 { color: #007bff; margin-bottom: 20px; }
+        select, input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 10px; box-sizing: border-box; font-size: 16px; }
+        button { width: 100%; padding: 15px; border: none; border-radius: 10px; background-color: #28a745; color: white; font-size: 18px; cursor: pointer; transition: 0.3s; }
+        button:hover { background-color: #218838; }
+        #stopMessage { display: none; color: #dc3545; font-weight: bold; padding: 20px; border: 2px dashed #dc3545; border-radius: 10px; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-<div class="header"><h2>مجمع نبض الطبي 🩺</h2></div>
-
 <div class="container">
-    <div id="near-alert">⚠️ انتبه: بقي أقل من 3 أشخاص على دورك!</div>
-
-    <div class="card" id="booking-card">
-        <h3>حجز موعد جديد</h3>
-        
-        <label>1. اختر التخصص:</label>
-        <select id="dept-select" onchange="filterDoctors()"><option value="">جاري التحميل...</option></select>
-
-        <label>2. اختر الطبيب:</label>
-        <select id="doctor-select" onchange="showDocDetails()"><option value="">اختر التخصص أولاً</option></select>
-
-        <div id="doc-info" class="doc-info-box">
-            <p>📍 <b>الموقع:</b> <span id="info-location"></span></p>
-            <p>⏰ <b>ساعات العمل:</b> <span id="info-hours"></span></p>
-        </div>
-
-        <label>3. اختر تاريخ الموعد المتاح:</label>
-        <select id="booking-date"><option value="">-- اختر الطبيب أولاً --</option></select>
-
-        <label>4. البيانات الشخصية للمريض:</label>
-        <input type="text" id="p-name" placeholder="الاسم الكامل">
-        
-        <div class="flex-row">
-            <div>
-                <input type="number" id="p-age" placeholder="العمر">
-            </div>
-            <div>
-                <input type="tel" id="p-phone" placeholder="رقم الهاتف">
-            </div>
-        </div>
-        
-        <input type="text" id="p-address" placeholder="موقع السكن (المدينة / المنطقة)">
-        
-        <button id="book-btn" onclick="confirmBooking()" disabled>تأكيد الحجز الآن</button>
+    <h1>مجمع نبض الطبي</h1>
+    
+    <div id="bookingForm">
+        <p>الرجاء إدخال بياناتك لحجز دور</p>
+        <input type="text" id="patientName" placeholder="اسم المريض الثلاثي" required>
+        <select id="doctorSelect">
+            <option value="">اختر الطبيب...</option>
+        </select>
+        <button onclick="bookNow()">حجز الموعد الآن</button>
     </div>
 
-    <div class="card" id="manage-booking">
-        <h3 style="color: var(--danger);">تم الحجز بنجاح!</h3>
-        <p>رقم دورك محفوظ بالأسفل. للإلغاء اضغط هنا:</p>
-        <button class="btn-cancel" onclick="cancelBooking()">إلغاء الموعد</button>
-    </div>
-
-    <div class="card">
-        <div class="stats-grid">
-            <div class="stat-item"><span class="stat-val" id="current-num">0</span><small>الحالي</small></div>
-            <div class="stat-item" style="background: #eefaff;"><span class="stat-val" id="ahead-count">0</span><small>أمامك</small></div>
-            <div class="stat-item"><span class="stat-val" id="my-num">--</span><small>رقمك</small></div>
-        </div>
+    <div id="stopMessage">
+        نعتذر منك، الحجز الإلكتروني متوقف حالياً. يرجى المحاولة لاحقاً أو زيارة المجمع.
     </div>
 </div>
 
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 <script>
-    const config = { apiKey: "AIzaSyBzanPVbS8RWulSgQnnV-QJSTrnVbLX8Tw", databaseURL: "https://nabid-app-default-rtdb.europe-west1.firebasedatabase.app" };
-    firebase.initializeApp(config);
+    const firebaseConfig = { databaseURL: "https://nabid-app-default-rtdb.europe-west1.firebasedatabase.app" };
+    firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    let allDocs = {};
-
-    db.ref('hospital/settings/doctors').on('value', s => {
-        allDocs = s.val() || {};
-        const deptSelect = document.getElementById('dept-select');
-        const depts = new Set();
-        for (let n in allDocs) if (allDocs[n].specialty) depts.add(allDocs[n].specialty);
-        deptSelect.innerHTML = '<option value="">-- اختر التخصص --</option>';
-        depts.forEach(d => deptSelect.innerHTML += `<option value="${d}">${d}</option>`);
+    // 1. مراقبة حالة الحجز (مفتوح أم مغلق) وتحديث الواجهة فوراً
+    db.ref('settings/bookingEnabled').on('value', (snapshot) => {
+        const isEnabled = snapshot.val();
+        if (isEnabled === false) {
+            document.getElementById('bookingForm').style.display = 'none';
+            document.getElementById('stopMessage').style.display = 'block';
+        } else {
+            document.getElementById('bookingForm').style.display = 'block';
+            document.getElementById('stopMessage').style.display = 'none';
+        }
     });
 
-    function filterDoctors() {
-        const selectedDept = document.getElementById('dept-select').value;
-        const docSelect = document.getElementById('doctor-select');
-        docSelect.innerHTML = '<option value="">-- اختر الطبيب --</option>';
-        for (let n in allDocs) if (allDocs[n].specialty === selectedDept) docSelect.innerHTML += `<option value="${n}">${n}</option>`;
-        document.getElementById('doc-info').style.display = 'none';
-    }
+    // 2. تحميل قائمة الأطباء تلقائياً
+    db.ref('doctors').on('value', (snapshot) => {
+        const doctors = snapshot.val();
+        const select = document.getElementById('doctorSelect');
+        select.innerHTML = '<option value="">اختر الطبيب...</option>';
+        for (let id in doctors) {
+            let opt = document.createElement('option');
+            opt.value = doctors[id].name;
+            opt.innerHTML = doctors[id].name;
+            select.appendChild(opt);
+        }
+    });
 
-    function showDocDetails() {
-        const docName = document.getElementById('doctor-select').value;
-        if(!docName) return;
-        const docData = allDocs[docName];
-        document.getElementById('info-location').innerText = docData.location || "غير محدد";
-        document.getElementById('info-hours').innerText = docData.workingHours || "غير محدد";
-        document.getElementById('doc-info').style.display = 'block';
-        loadAvailableDates(docName);
+    // 3. وظيفة الحجز
+    function bookNow() {
+        const name = document.getElementById('patientName').value;
+        const doctor = document.getElementById('doctorSelect').value;
+        const now = new Date().toLocaleTimeString('ar-SA');
 
-        db.ref('hospital/settings/doctors/' + docName + '/bookingStatus').on('value', s => {
-            document.getElementById('book-btn').disabled = (s.val() !== 'open');
-        });
-
-        db.ref('hospital/doctors/' + docName + '/currentNumber').on('value', s => {
-            const current = s.val() || 0;
-            document.getElementById('current-num').innerText = current;
-            updateAheadCount(current);
-        });
-    }
-
-    function loadAvailableDates(docName) {
-        db.ref('hospital/settings/doctors/' + docName + '/availableDates').on('value', s => {
-            const dateSelect = document.getElementById('booking-date');
-            dateSelect.innerHTML = '<option value="">-- اختر تاريخاً --</option>';
-            const dates = s.val() || {};
-            for(let d in dates) dateSelect.innerHTML += `<option value="${d}">${d}</option>`;
-        });
-    }
-
-    function updateAheadCount(current) {
-        const myNum = parseInt(document.getElementById('my-num').innerText) || 0;
-        if (myNum > 0) {
-            const ahead = myNum - current;
-            document.getElementById('ahead-count').innerText = ahead > 0 ? ahead - 1 : 0;
-            document.getElementById('near-alert').style.display = (ahead <= 3 && ahead > 0) ? 'block' : 'none';
+        if (name && doctor) {
+            db.ref('appointments').push({
+                patientName: name,
+                doctorName: doctor,
+                time: now
+            }).then(() => {
+                alert("تم حجز موعدك بنجاح!");
+                document.getElementById('patientName').value = "";
+            });
+        } else {
+            alert("يرجى إكمال البيانات");
         }
     }
-
-    function confirmBooking() {
-        const docName = document.getElementById('doctor-select').value;
-        const name = document.getElementById('p-name').value;
-        const age = document.getElementById('p-age').value;
-        const phone = document.getElementById('p-phone').value;
-        const address = document.getElementById('p-address').value;
-        const date = document.getElementById('booking-date').value;
-
-        if(!docName || !name || !date || !phone) return alert("يرجى ملء الاسم، الهاتف والتاريخ على الأقل");
-
-        const docRef = db.ref('hospital/doctors/' + docName);
-        docRef.child('lastIssuedNumber').transaction(c => (c || 0) + 1, (err, comm, snap) => {
-            if(comm) {
-                const num = snap.val();
-                docRef.child('appointments/' + num).set({ 
-                    name, age, phone, address, date 
-                });
-                document.getElementById('my-num').innerText = num;
-                document.getElementById('booking-card').style.display = 'none';
-                document.getElementById('manage-booking').style.display = 'block';
-                alert("تم الحجز بنجاح! رقمك: " + num);
-            }
-        });
-    }
-
-    function cancelBooking() {
-        if (!confirm("هل تريد إلغاء الحجز؟")) return;
-        const docName = document.getElementById('doctor-select').value;
-        const myNum = document.getElementById('my-num').innerText;
-        db.ref('hospital/doctors/' + docName + '/appointments/' + myNum).remove().then(() => {
-            location.reload();
-        });
-    }
 </script>
+
 </body>
 </html>
