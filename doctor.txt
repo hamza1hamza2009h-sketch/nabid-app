@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة الطبيب الذكية - نظام نبض</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --bg: #f4f7f6; }
+        body { font-family: 'Cairo', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .main-layout { display: flex; gap: 20px; max-width: 1300px; margin: auto; flex-wrap: wrap; }
+        .card { background: white; padding: 20px; border-radius: 20px; box-shadow: 0 5px 15px rgba(0,0,0,0.05); }
+        
+        .patient-area { flex: 2; min-width: 350px; border-top: 8px solid var(--accent); }
+        .archive-area { flex: 1.2; min-width: 320px; max-height: 90vh; display: flex; flex-direction: column; }
+        
+        .search-box { background: #f8f9fa; padding: 10px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #eee; }
+        .search-input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #ddd; margin-bottom: 8px; font-family: 'Cairo'; box-sizing: border-box; }
+        
+        .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: right; margin: 15px 0; }
+        .info-item { background: #eefaff; padding: 10px; border-radius: 10px; font-size: 14px; }
+        
+        textarea { width: 100%; height: 120px; border-radius: 10px; padding: 10px; border: 1px solid #ddd; font-family: 'Cairo'; margin-bottom: 10px; box-sizing: border-box; }
+        .btn { padding: 12px 25px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; color: white; transition: 0.3s; }
+        .btn-next { background: var(--success); width: 100%; font-size: 18px; }
+        .btn-note { background: var(--accent); width: 100%; margin-bottom: 10px; }
+        
+        .archive-list-container { overflow-y: auto; flex-grow: 1; }
+        .archive-item { padding: 12px; border-bottom: 1px solid #eee; text-align: right; border-radius: 8px; margin-bottom: 5px; background: #fff; }
+        .archive-item:hover { background: #f0f7ff; }
+        .archive-tag { font-size: 11px; background: #ddd; padding: 2px 6px; border-radius: 4px; color: #555; }
+        .archive-note { font-size: 13px; color: #d63031; margin-top: 5px; font-weight: bold; }
+        
+        #auth-screen { text-align: center; margin-top: 100px; }
+    </style>
+</head>
+<body>
+
+<div id="auth-screen" class="card" style="max-width:350px; margin: 100px auto;">
+    <h2>دخول الطبيب 👨‍⚕️</h2>
+    <input type="text" id="doc-name" placeholder="اسم الدكتور" style="width:90%; padding:10px; margin:10px 0;">
+    <input type="password" id="doc-pass" placeholder="كلمة المرور" style="width:90%; padding:10px; margin:10px 0;">
+    <button class="btn btn-next" onclick="login()">دخول</button>
+</div>
+
+<div id="doctor-ui" class="main-layout" style="display:none;">
+    <div class="card patient-area">
+        <h2 id="display-doc-name">د. </h2>
+        <div id="current-patient-content">
+            <h3>المريض الحالي بالداخل:</h3>
+            <h1 id="curr-p-name" style="color:var(--accent); margin:10px 0;">بانتظار مريض...</h1>
+            <div class="info-grid">
+                <div class="info-item"><b>العمر:</b> <span id="curr-p-age">--</span></div>
+                <div class="info-item"><b>السكن:</b> <span id="curr-p-address">--</span></div>
+                <div class="info-item"><b>الهاتف:</b> <span id="curr-p-phone">--</span></div>
+                <div class="info-item"><b>رقم الدور:</b> <span id="curr-p-num">--</span></div>
+            </div>
+            <textarea id="doctor-note" placeholder="اكتب التشخيص أو الملاحظات هنا..."></textarea>
+            <button class="btn btn-note" onclick="saveNote()">حفظ وإرسال الملاحظة ✅</button>
+            <button class="btn btn-next" onclick="nextPatient()">استدعاء المريض التالي ➔</button>
+        </div>
+    </div>
+
+    <div class="card archive-area">
+        <h3>🔍 بحث في السجلات</h3>
+        <div class="search-box">
+            <input type="text" id="search-input" class="search-input" placeholder="ابحث بالاسم أو الهاتف..." oninput="filterArchive()">
+            <input type="date" id="search-date" class="search-input" onchange="filterArchive()">
+        </div>
+        <div class="archive-list-container" id="archive-list"></div>
+    </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script>
+    const config = { apiKey: "AIzaSyBzanPVbS8RWulSgQnnV-QJSTrnVbLX8Tw", databaseURL: "https://nabid-app-default-rtdb.europe-west1.firebasedatabase.app" };
+    firebase.initializeApp(config);
+    const db = firebase.database();
+    let myName = "";
+    let allAppointments = {};
+
+    function login() {
+        const name = document.getElementById('doc-name').value;
+        const pass = document.getElementById('doc-pass').value;
+        db.ref('hospital/settings/doctors/' + name).once('value', s => {
+            if(s.val() && s.val().password === pass) {
+                myName = name;
+                document.getElementById('auth-screen').style.display = 'none';
+                document.getElementById('doctor-ui').style.display = 'flex';
+                document.getElementById('display-doc-name').innerText = "د. " + name;
+                listenToData();
+            } else alert("بيانات الدخول خاطئة");
+        });
+    }
+
+    function listenToData() {
+        db.ref('hospital/doctors/' + myName).on('value', s => {
+            const data = s.val() || {};
+            const currNum = data.currentNumber || 0;
+            allAppointments = data.appointments || {};
+            const p = allAppointments[currNum];
+            if(p) {
+                document.getElementById('curr-p-name').innerText = p.name;
+                document.getElementById('curr-p-age').innerText = p.age || "غير مسجل";
+                document.getElementById('curr-p-address').innerText = p.address || "غير مسجل";
+                document.getElementById('curr-p-phone').innerText = p.phone;
+                document.getElementById('curr-p-num').innerText = currNum;
+                document.getElementById('doctor-note').value = p.doctorNote || "";
+            } else {
+                document.getElementById('curr-p-name').innerText = "لا يوجد مرضى حالياً";
+            }
+            filterArchive();
+        });
+    }
+
+    function filterArchive() {
+        const searchText = document.getElementById('search-input').value.toLowerCase();
+        const searchDate = document.getElementById('search-date').value;
+        const listContainer = document.getElementById('archive-list');
+        listContainer.innerHTML = "";
+        const keys = Object.keys(allAppointments).sort((a, b) => b - a);
+        keys.forEach(id => {
+            const p = allAppointments[id];
+            const matchText = (p.name || "").toLowerCase().includes(searchText) || (p.phone || "").includes(searchText);
+            const matchDate = searchDate ? (p.date === searchDate) : true;
+            if (matchText && matchDate) {
+                listContainer.innerHTML += `<div class="archive-item">
+                    <b>${p.name} <small class="archive-tag">#${id}</small></b><br>
+                    <small>📅 ${p.date} | 📞 ${p.phone}</small>
+                    <div class="archive-note">📝 ${p.doctorNote || 'بدون ملاحظة'}</div>
+                </div>`;
+            }
+        });
+    }
+
+    function saveNote() {
+        db.ref('hospital/doctors/' + myName + '/currentNumber').once('value', s => {
+            const num = s.val();
+            const note = document.getElementById('doctor-note').value;
+            if(num > 0) db.ref('hospital/doctors/' + myName + '/appointments/' + num).update({ doctorNote: note }).then(() => alert("تم الحفظ"));
+        });
+    }
+
+    function nextPatient() {
+        db.ref('hospital/doctors/' + myName + '/currentNumber').transaction(c => (c || 0) + 1);
+    }
+</script>
+</body>
+</html>

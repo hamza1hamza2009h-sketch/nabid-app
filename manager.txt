@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>إدارة النظام - مجمع نبض</title>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f4f7f6; --success: #27ae60; }
+        body { font-family: 'Cairo', sans-serif; background: var(--bg); margin: 0; padding: 20px; text-align: center; }
+        .container { max-width: 500px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        h2 { color: var(--primary); margin-bottom: 25px; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #ddd; font-family: 'Cairo'; box-sizing: border-box; }
+        button { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--success); color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        .doc-list { margin-top: 30px; text-align: right; border-top: 2px solid #eee; padding-top: 20px; }
+        .doc-item { background: #f9f9f9; padding: 10px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-right: 4px solid var(--accent); }
+        .del-btn { background: #e74c3c; color: white; border: none; padding: 5px 15px; border-radius: 8px; cursor: pointer; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>إضافة طبيب جديد 👨‍⚕️</h2>
+    <input type="text" id="doc-name" placeholder="اسم الطبيب (مثلاً: د. أحمد)">
+    <input type="text" id="doc-specialty" placeholder="تخصص العيادة (مثلاً: عيون، قلبية)">
+    <input type="text" id="doc-location" placeholder="موقع العيادة (الطابق - الجناح)">
+    <input type="text" id="doc-hours" placeholder="ساعات العمل (مثلاً: 10 ص - 4 م)">
+    <input type="password" id="doc-pass" placeholder="كلمة مرور الطبيب والسكرتير">
+    <button onclick="addDoctor()">حفظ وإضافة للنظام</button>
+    <div class="doc-list">
+        <h3>قائمة الأطباء الحالية:</h3>
+        <div id="list-container">جاري التحميل...</div>
+    </div>
+</div>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+<script>
+    const firebaseConfig = { apiKey: "AIzaSyBzanPVbS8RWulSgQnnV-QJSTrnVbLX8Tw", databaseURL: "https://nabid-app-default-rtdb.europe-west1.firebasedatabase.app" };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+    function addDoctor() {
+        const name = document.getElementById('doc-name').value.trim();
+        const specialty = document.getElementById('doc-specialty').value.trim();
+        const location = document.getElementById('doc-location').value.trim();
+        const hours = document.getElementById('doc-hours').value.trim();
+        const pass = document.getElementById('doc-pass').value.trim();
+        if (!name || !specialty || !pass) return alert("يرجى إكمال البيانات الأساسية");
+        db.ref('hospital/settings/doctors/' + name).set({
+            password: pass, specialty: specialty, location: location, workingHours: hours, bookingStatus: 'open'
+        });
+        db.ref('hospital/doctors/' + name).update({ currentNumber: 0, lastIssuedNumber: 0 }).then(() => {
+            alert("تمت الإضافة بنجاح");
+            document.querySelectorAll('input').forEach(i => i.value = "");
+        });
+    }
+    db.ref('hospital/settings/doctors').on('value', (snapshot) => {
+        const container = document.getElementById('list-container');
+        container.innerHTML = "";
+        const data = snapshot.val();
+        for (let name in data) {
+            const item = document.createElement('div');
+            item.className = 'doc-item';
+            item.innerHTML = `<div><b>${name}</b><br><small>${data[name].specialty}</small></div>
+                <button class="del-btn" onclick="deleteDoc('${name}')">حذف</button>`;
+            container.appendChild(item);
+        }
+    });
+    function deleteDoc(name) {
+        if (confirm("حذف " + name + "؟")) {
+            db.ref('hospital/settings/doctors/' + name).remove();
+            db.ref('hospital/doctors/' + name).remove();
+        }
+    }
+</script>
+</body>
+</html>
