@@ -3,72 +3,148 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>إدارة النظام - مجمع نبض</title>
+    <title>إدارة مجمع نبض - اللوحة الرئيسية</title>
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --bg: #f4f7f6; --success: #27ae60; }
-        body { font-family: 'Cairo', sans-serif; background: var(--bg); margin: 0; padding: 20px; text-align: center; }
-        .container { max-width: 500px; margin: auto; background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
-        h2 { color: var(--primary); margin-bottom: 25px; }
-        input { width: 100%; padding: 12px; margin: 10px 0; border-radius: 10px; border: 1px solid #ddd; font-family: 'Cairo'; box-sizing: border-box; }
-        button { width: 100%; padding: 15px; border-radius: 10px; border: none; background: var(--success); color: white; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
-        .doc-list { margin-top: 30px; text-align: right; border-top: 2px solid #eee; padding-top: 20px; }
-        .doc-item { background: #f9f9f9; padding: 10px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-right: 4px solid var(--accent); }
-        .del-btn { background: #e74c3c; color: white; border: none; padding: 5px 15px; border-radius: 8px; cursor: pointer; }
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --pharmacy: #9b59b6; --bg: #f4f7f6; }
+        body { font-family: 'Cairo', sans-serif; background: var(--bg); margin: 0; padding: 20px; }
+        .container { max-width: 900px; margin: auto; }
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 15px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        h2 { color: var(--primary); border-bottom: 2px solid #eee; padding-bottom: 10px; margin-top: 0; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+        input { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: 1px solid #ddd; box-sizing: border-box; font-family: 'Cairo'; }
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; color: white; font-weight: bold; cursor: pointer; transition: 0.3s; margin-top: 10px; }
+        .btn-doc { background: var(--success); }
+        .btn-pharma { background: var(--pharmacy); }
+        
+        .list-section { margin-top: 20px; }
+        .item { background: #f9f9f9; padding: 10px; border-radius: 8px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; border-right: 5px solid #ccc; }
+        .item.doc { border-right-color: var(--success); }
+        .item.pharma { border-right-color: var(--pharmacy); }
+        .del-btn { background: #e74c3c; color: white; border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer; font-size: 12px; }
     </style>
 </head>
 <body>
+
 <div class="container">
-    <h2>إضافة طبيب جديد 👨‍⚕️</h2>
-    <input type="text" id="doc-name" placeholder="اسم الطبيب (مثلاً: د. أحمد)">
-    <input type="text" id="doc-specialty" placeholder="تخصص العيادة (مثلاً: عيون، قلبية)">
-    <input type="text" id="doc-location" placeholder="موقع العيادة (الطابق - الجناح)">
-    <input type="text" id="doc-hours" placeholder="ساعات العمل (مثلاً: 10 ص - 4 م)">
-    <input type="password" id="doc-pass" placeholder="كلمة مرور الطبيب والسكرتير">
-    <button onclick="addDoctor()">حفظ وإضافة للنظام</button>
-    <div class="doc-list">
-        <h3>قائمة الأطباء الحالية:</h3>
-        <div id="list-container">جاري التحميل...</div>
+    <h1 style="text-align: center; color: var(--primary);">⚙️ لوحة تحكم المدير - مجمع نبض</h1>
+
+    <div class="card">
+        <h2><i class="fas fa-user-md"></i> إضافة طبيب جديد</h2>
+        <div class="grid">
+            <input type="text" id="doc-name" placeholder="اسم الطبيب (مثلاً: د. أحمد)">
+            <input type="text" id="doc-specialty" placeholder="التخصص (مثلاً: عيون)">
+            <input type="text" id="doc-location" placeholder="موقع العيادة (الطابق - الجناح)">
+            <input type="text" id="doc-hours" placeholder="ساعات العمل (مثلاً: 10ص - 4م)">
+            <input type="password" id="doc-pass" placeholder="كلمة مرور الطبيب">
+        </div>
+        <button class="btn-doc" onclick="addDoctor()">حفظ وإضافة الطبيب</button>
+        
+        <div class="list-section">
+            <small>الأطباء الحاليين:</small>
+            <div id="docs-list"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2><i class="fas fa-pills"></i> إضافة صيدلية جديدة</h2>
+        <div class="grid">
+            <input type="text" id="ph-name" placeholder="اسم الصيدلية">
+            <input type="text" id="ph-location" placeholder="موقع الصيدلية (مثلاً: المدخل الرئيسي)">
+            <input type="text" id="ph-hours" placeholder="ساعات العمل (مثلاً: 24 ساعة)">
+            <input type="password" id="ph-pass" placeholder="كلمة مرور الصيدلية">
+        </div>
+        <button class="btn-pharma" onclick="addPharmacy()">حفظ وإضافة الصيدلية</button>
+
+        <div class="list-section">
+            <small>الصيدليات الحالية:</small>
+            <div id="pharma-list"></div>
+        </div>
     </div>
 </div>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+
 <script>
     const firebaseConfig = { apiKey: "AIzaSyBzanPVbS8RWulSgQnnV-QJSTrnVbLX8Tw", databaseURL: "https://nabid-app-default-rtdb.europe-west1.firebasedatabase.app" };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
+
+    // وظيفة إضافة الطبيب
     function addDoctor() {
         const name = document.getElementById('doc-name').value.trim();
         const specialty = document.getElementById('doc-specialty').value.trim();
         const location = document.getElementById('doc-location').value.trim();
         const hours = document.getElementById('doc-hours').value.trim();
         const pass = document.getElementById('doc-pass').value.trim();
-        if (!name || !specialty || !pass) return alert("يرجى إكمال البيانات الأساسية");
+
+        if (!name || !pass) return alert("يرجى إكمال البيانات الأساسية للطبيب");
+
+        // حفظ البيانات في الإعدادات العامة للمجمع
         db.ref('hospital/settings/doctors/' + name).set({
-            password: pass, specialty: specialty, location: location, workingHours: hours, bookingStatus: 'open'
+            password: pass, specialty: specialty, location: location, workingHours: hours
         });
+
+        // تهيئة عداد الأرقام للطبيب في مسار المتابعة الحية
         db.ref('hospital/doctors/' + name).update({ currentNumber: 0, lastIssuedNumber: 0 }).then(() => {
-            alert("تمت الإضافة بنجاح");
-            document.querySelectorAll('input').forEach(i => i.value = "");
+            alert("تم إضافة الطبيب بنجاح");
+            clearInputs('doc');
         });
     }
-    db.ref('hospital/settings/doctors').on('value', (snapshot) => {
-        const container = document.getElementById('list-container');
-        container.innerHTML = "";
-        const data = snapshot.val();
-        for (let name in data) {
-            const item = document.createElement('div');
-            item.className = 'doc-item';
-            item.innerHTML = `<div><b>${name}</b><br><small>${data[name].specialty}</small></div>
-                <button class="del-btn" onclick="deleteDoc('${name}')">حذف</button>`;
-            container.appendChild(item);
-        }
+
+    // وظيفة إضافة الصيدلية
+    function addPharmacy() {
+        const name = document.getElementById('ph-name').value.trim();
+        const location = document.getElementById('ph-location').value.trim();
+        const hours = document.getElementById('ph-hours').value.trim();
+        const pass = document.getElementById('ph-pass').value.trim();
+
+        if (!name || !pass) return alert("يرجى إكمال بيانات الصيدلية");
+
+        db.ref('hospital/pharmacies/' + name).set({
+            password: pass, location: location, hours: hours
+        }).then(() => {
+            alert("تم إضافة الصيدلية بنجاح");
+            clearInputs('ph');
+        });
+    }
+
+    // عرض القوائم وتحديثها لحظياً
+    db.ref('hospital/settings/doctors').on('value', snap => {
+        renderList(snap, 'docs-list', 'doc');
     });
-    function deleteDoc(name) {
-        if (confirm("حذف " + name + "؟")) {
+
+    db.ref('hospital/pharmacies').on('value', snap => {
+        renderList(snap, 'pharma-list', 'pharma');
+    });
+
+    function renderList(snap, containerId, type) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = "";
+        snap.forEach(child => {
+            const data = child.val();
+            container.innerHTML += `
+                <div class="item ${type}">
+                    <span><b>${child.key}</b> - ${data.specialty || data.location}</span>
+                    <button class="del-btn" onclick="deleteItem('${type}', '${child.key}')">حذف</button>
+                </div>`;
+        });
+    }
+
+    function deleteItem(type, name) {
+        if (!confirm(`هل أنت متأكد من حذف ${name}؟`)) return;
+        if (type === 'doc') {
             db.ref('hospital/settings/doctors/' + name).remove();
             db.ref('hospital/doctors/' + name).remove();
+        } else {
+            db.ref('hospital/pharmacies/' + name).remove();
         }
+    }
+
+    function clearInputs(type) {
+        const inputs = type === 'doc' ? ['doc-name', 'doc-specialty', 'doc-location', 'doc-hours', 'doc-pass'] 
+                                      : ['ph-name', 'ph-location', 'ph-hours', 'ph-pass'];
+        inputs.forEach(id => document.getElementById(id).value = "");
     }
 </script>
 </body>
