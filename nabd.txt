@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>منصة نبض سوريا الطبية</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2280%22>🏥</text></svg>">
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        :root { --primary: #2c3e50; --success: #27ae60; --accent: #3498db; --warning: #f39c12; --danger: #e74c3c; --bg: #f4f7f6; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); margin: 0; padding: 0; }
+        
+        /* شاشة البوابة */
+        .gate-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #1a2a3a, #2c3e50); color: white; }
+        .gate-card { background: white; padding: 30px; border-radius: 20px; width: 90%; max-width: 400px; box-shadow: 0 15px 35px rgba(0,0,0,0.4); text-align: center; color: #333; }
+        .gate-btn { width: 100%; padding: 15px; margin: 10px 0; border: none; border-radius: 12px; font-size: 18px; font-weight: bold; cursor: pointer; transition: 0.3s; color: white; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .btn-p { background: var(--accent); } .btn-d { background: var(--primary); } .btn-s { background: var(--warning); } .btn-ph { background: var(--success); }
+
+        .interface { display: none; padding: 20px; animation: slideUp 0.4s ease; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th { background: var(--primary); color: white; padding: 12px; font-size: 14px; }
+        td { padding: 10px; border-bottom: 1px solid #eee; text-align: center; font-size: 14px; }
+        input, select, textarea { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #ddd; box-sizing: border-box; font-family: inherit; font-size: 15px; }
+        .btn-action { padding: 12px 20px; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; color: white; transition: 0.2s; }
+        
+        .home-nav { position: fixed; bottom: 20px; left: 20px; background: #000; color: white; padding: 12px 25px; border-radius: 50px; cursor: pointer; z-index: 1000; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .live-status { background: #e8f4fd; padding: 15px; border-radius: 12px; margin: 15px 0; border-right: 5px solid var(--accent); text-align: right; }
+        .exam-card { background: #fffbe6; border: 2px solid var(--warning); padding: 15px; border-radius: 12px; margin-bottom: 20px; text-align: right; }
+        .order-card { border-right: 6px solid var(--success); background: #f9f9f9; padding: 15px; margin-bottom: 12px; border-radius: 10px; text-align: right; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    </style>
+</head>
+<body>
+
+    <div id="navHome" class="home-nav" style="display:none;" onclick="location.reload()">
+        <i class="fas fa-arrow-right"></i> القائمة الرئيسية
+    </div>
+
+    <div id="gate" class="gate-screen">
+        <div class="gate-card">
+            <h1 style="color: var(--primary); margin-bottom: 5px;">🏥 نبض سوريا</h1>
+            <p style="color: #666; margin-bottom: 25px;">النظام الطبي الموحد للمحافظات</p>
+            <button class="gate-btn btn-p" onclick="showUI('patient')"><i class="fas fa-search-location"></i> أنا مريض (حجز/تتبع)</button>
+            <button class="gate-btn btn-d" onclick="showUI('doctor')"><i class="fas fa-user-md"></i> عيادة الطبيب</button>
+            <button class="gate-btn btn-s" onclick="showUI('sec')"><i class="fas fa-file-medical"></i> قسم السكرتارية</button>
+            <button class="gate-btn btn-ph" onclick="showUI('pharma')"><i class="fas fa-pills"></i> قسم الصيدلية</button>
+        </div>
+    </div>
+
+    <div id="patient-ui" class="interface">
+        <div class="container">
+            <h2 style="color:var(--accent); text-align:center;"><i class="fas fa-hospital-user"></i> بوابة المريض السوري</h2>
+            <div style="display: flex; gap: 10px;">
+                <button class="gate-btn btn-p" style="font-size:14px" onclick="setPMode('check')">تتبع حجزي ودواءي</button>
+                <button class="gate-btn btn-p" style="background:#2ecc71; font-size:14px" onclick="setPMode('new')">حجز موعد جديد</button>
+            </div>
+
+            <div id="p-check" style="display:none; margin-top:20px; text-align: right;">
+                <label>أدخل اسمك كما هو في الحجز:</label>
+                <input type="text" id="checkName" placeholder="الاسم الثلاثي">
+                <button class="btn-action" style="background:var(--accent); width:100%" onclick="checkMyAppointment()">بحث عن حالتي</button>
+                <div id="appointmentDetails" class="live-status" style="display:none;">
+                    <b>الطبيب:</b> <span id="resDoctor"></span> | <b>التاريخ:</b> <span id="resDate"></span>
+                    <div id="presStatusArea" style="margin-top:10px; color: var(--success); font-weight: bold;"></div>
+                </div>
+            </div>
+
+            <div id="p-new" style="display:none; margin-top:20px; text-align: right;">
+                <label><i class="fas fa-map-marker-alt"></i> اختر المحافظة:</label>
+                <select id="provSel" onchange="filterClinics()">
+                    <option value="">-- اختر المحافظة --</option>
+                    <option>دمشق</option><option>ريف دمشق</option><option>حلب</option><option>حمص</option>
+                    <option>حماة</option><option>اللاذقية</option><option>طرطوس</option><option>إدلب</option>
+                    <option>دير الزور</option><option>الرقة</option><option>الحسكة</option><option>درعا</option>
+                    <option>السويداء</option><option>القنيطرة</option>
+                </select>
+
+                <label>العيادات المتوفرة:</label>
+                <select id="clinicSel" onchange="filterDocs()"><option value="">اختر المحافظة أولاً</option></select>
+
+                <label>الطبيب المعالج:</label>
+                <select id="docSelP" onchange="watchLive()"><option value="">اختر العيادة</option></select>
+
+                <div id="liveBox" class="live-status" style="display:none;">
+                    الرقم الحالي عند الطبيب: <b id="curN">0</b> | المنتظرون في العيادة: <b id="waitN">0</b>
+                </div>
+
+                <label>المواعيد المتاحة:</label>
+                <select id="dateSelP"><option>تحميل المواعيد...</option></select>
+                
+                <input type="text" id="pNameInput" placeholder="اسمك الثلاثي">
+                <input type="number" id="pAgeInput" placeholder="العمر">
+                <input type="text" id="pAddrInput" placeholder="السكن الحالي">
+                
+                <button class="btn-action" style="background:var(--success); width:100%" onclick="bookNow()">تأكيد الحجز المسبق</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="doctor-ui" class="interface">
+        <div class="container">
+            <div id="docLogin" style="text-align:center">
+                <h3><i class="fas fa-user-md"></i> دخول الطبيب</h3>
+                <input type="text" id="dName" placeholder="اسم الطبيب">
+                <input type="password" id="dPass" placeholder="كلمة المرور">
+                <button class="btn-action" style="background:var(--primary); width:100%" onclick="docLogin()">دخول للعيادة</button>
+            </div>
+            <div id="docMain" style="display:none;">
+                <h3 id="dHello"></h3>
+                <div id="examDiv" class="exam-card" style="display:none;">
+                    <h4>فحص: <span id="activeP"></span></h4>
+                    <textarea id="diag" rows="2" placeholder="التشخيص الطبي"></textarea>
+                    <textarea id="pres" rows="3" placeholder="الوصفة والأدوية"></textarea>
+                    <select id="phSelDoc"></select>
+                    <button class="btn-action" style="background:var(--success)" onclick="saveExam()">إرسال وأرشفة</button>
+                    <button class="btn-action" style="background:var(--warning)" onclick="nextP()">المريض التالي</button>
+                </div>
+                <table>
+                    <thead><tr><th>المريض</th><th>العمر</th><th>إجراء</th></tr></thead>
+                    <tbody id="docT"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="sec-ui" class="interface">
+        <div class="container">
+            <div id="secLog" style="text-align:center">
+                <h3>دخول السكرتارية</h3>
+                <input type="text" id="sDoc" placeholder="اسم عيادة الطبيب">
+                <input type="password" id="sPass" placeholder="كلمة المرور">
+                <button class="btn-action" style="background:var(--warning); width:100%" onclick="secLogin()">دخول</button>
+            </div>
+            <div id="secMain" style="display:none;">
+                <div class="live-status">
+                    <label>إضافة تاريخ حجز جديد:</label>
+                    <input type="date" id="newDate">
+                    <button class="btn-action" style="background:var(--success); width:100%" onclick="addDay()">تفعيل هذا التاريخ</button>
+                    <div id="daysList" style="margin-top:10px;"></div>
+                </div>
+                <h4 id="secTitle">اختر تاريخاً لعرض الأسماء</h4>
+                <table>
+                    <thead><tr><th>الاسم</th><th>السكن</th><th>إجراء</th></tr></thead>
+                    <tbody id="secT"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div id="pharma-ui" class="interface">
+        <div class="container">
+            <div id="phLog" style="text-align:center">
+                <h3>دخول الصيدلية</h3>
+                <input type="text" id="phN" placeholder="اسم الصيدلية">
+                <input type="password" id="phP" placeholder="كلمة المرور">
+                <button class="btn-action" style="background:var(--success); width:100%" onclick="phLogin()">دخول</button>
+            </div>
+            <div id="phMain" style="display:none;">
+                <h3 id="phTitle" style="color:var(--success)"></h3>
+                <div id="phList"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // إعدادات Firebase
+        const firebaseConfig = { apiKey: "AIzaSyBzanPVbS8RWulSgQnnV-QJSTrnVbLX8Tw", databaseURL: "https://nabid-app-default-rtdb.europe-west1.firebasedatabase.app" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        function showUI(id) {
+            document.getElementById('gate').style.display = 'none';
+            document.getElementById('navHome').style.display = 'block';
+            document.getElementById(id + '-ui').style.display = 'block';
+            if(id === 'patient') loadGlobalSettings();
+        }
+
+        // --- المريض ---
+        function setPMode(m) {
+            document.getElementById('p-check').style.display = m === 'check' ? 'block' : 'none';
+            document.getElementById('p-new').style.display = m === 'new' ? 'block' : 'none';
+        }
+
+        function loadGlobalSettings() {
+            db.ref('settings/availableDays').on('value', s => {
+                let h = '<option value="">-- اختر التاريخ --</option>';
+                s.forEach(c => h += `<option value="${c.val()}">${c.val()}</option>`);
+                document.getElementById('dateSelP').innerHTML = h;
+            });
+        }
+
+        function filterClinics() {
+            const prov = document.getElementById('provSel').value;
+            db.ref('hospital/settings/doctors').once('value', s => {
+                let clinics = new Set();
+                s.forEach(d => { if(d.val().province === prov) clinics.add(d.val().specialty); });
+                let h = '<option value="">-- اختر العيادة --</option>';
+                clinics.forEach(c => h += `<option value="${c}">${c}</option>`);
+                document.getElementById('clinicSel').innerHTML = h;
+            });
+        }
+
+        function filterDocs() {
+            const prov = document.getElementById('provSel').value;
+            const cl = document.getElementById('clinicSel').value;
+            db.ref('hospital/settings/doctors').once('value', s => {
+                let h = '<option value="">-- اختر الطبيب --</option>';
+                s.forEach(d => { if(d.val().province === prov && d.val().specialty === cl) h += `<option value="${d.key}">${d.key}</option>`; });
+                document.getElementById('docSelP').innerHTML = h;
+            });
+        }
+
+        function watchLive() {
+            const d = document.getElementById('docSelP').value;
+            db.ref('hospital/doctors/'+d).on('value', s => {
+                if(s.val()){
+                    document.getElementById('liveBox').style.display = 'block';
+                    document.getElementById('curN').innerText = s.val().currentNumber || 0;
+                    document.getElementById('waitN').innerText = Math.max(0, (s.val().lastIssuedNumber || 0) - (s.val().currentNumber || 0));
+                }
+            });
+        }
+
+        function bookNow() {
+            const data = {
+                patientName: document.getElementById('pNameInput').value,
+                age: document.getElementById('pAgeInput').value,
+                address: document.getElementById('pAddrInput').value,
+                doctorName: document.getElementById('docSelP').value,
+                date: document.getElementById('dateSelP').value,
+                time: new Date().toLocaleTimeString('ar-SA')
+            };
+            if(!data.patientName || !data.doctorName) return alert("يرجى ملء كافة البيانات");
+            db.ref('appointments').push(data).then(() => {
+                db.ref('hospital/doctors/'+data.doctorName+'/lastIssuedNumber').transaction(n => (n||0)+1);
+                alert("تم حجز موعدك بنجاح"); location.reload();
+            });
+        }
+
+        function checkMyAppointment() {
+            const n = document.getElementById('checkName').value.trim();
+            db.ref('appointments').once('value', s => {
+                s.forEach(c => {
+                    if(c.val().patientName === n) {
+                        document.getElementById('appointmentDetails').style.display = 'block';
+                        document.getElementById('resDoctor').innerText = c.val().doctorName;
+                        document.getElementById('resDate').innerText = c.val().date;
+                    }
+                });
+            });
+            db.ref('pharmacy_orders').on('value', s => {
+                let area = document.getElementById('presStatusArea'); area.innerHTML = "";
+                s.forEach(ph => { ph.forEach(o => {
+                    if(o.val().patientName === n) area.innerHTML = `💊 وصفة جاهزة في: ${ph.key}`;
+                })});
+            });
+        }
+
+        // --- الطبيب ---
+        let cD = ""; let aPID = null;
+        function docLogin() {
+            const n = document.getElementById('dName').value;
+            if(n && document.getElementById('dPass').value === "1234") {
+                cD = n; document.getElementById('docLogin').style.display = 'none';
+                document.getElementById('docMain').style.display = 'block';
+                document.getElementById('dHello').innerText = "د. " + n;
+                db.ref('appointments').on('value', s => {
+                    const tb = document.getElementById('docT'); tb.innerHTML = "";
+                    s.forEach(c => { if(c.val().doctorName === cD) {
+                        tb.innerHTML += `<tr><td>${c.val().patientName}</td><td>${c.val().age}</td>
+                        <td><button class="btn-action" style="background:var(--accent)" onclick="openEx('${c.key}','${c.val().patientName}')">فحص</button></td></tr>`;
+                    }});
+                });
+                db.ref('hospital/pharmacies').on('value', s => {
+                    let h = '<option value="">-- إرسال للصيدلية --</option>';
+                    s.forEach(c => h += `<option value="${c.key}">${c.key}</option>`);
+                    document.getElementById('phSelDoc').innerHTML = h;
+                });
+            }
+        }
+
+        function openEx(id, n) { aPID = id; document.getElementById('activeP').innerText = n; document.getElementById('examDiv').style.display = 'block'; }
+        
+        function saveExam() {
+            const rec = { patientName: document.getElementById('activeP').innerText, doctorName: cD, prescription: document.getElementById('pres').value };
+            const ph = document.getElementById('phSelDoc').value;
+            if(ph) db.ref('pharmacy_orders/'+ph).push(rec);
+            db.ref('medical_archive').push(rec); alert("تم الأرشفة والإرسال");
+        }
+
+        function nextP() {
+            db.ref('hospital/doctors/'+cD+'/currentNumber').transaction(n => (n||0)+1);
+            db.ref('appointments/'+aPID).remove();
+            document.getElementById('examDiv').style.display = 'none';
+        }
+
+        // --- السكرتارية ---
+        let sD = "";
+        function secLogin() {
+            const n = document.getElementById('sDoc').value;
+            if(n && document.getElementById('sPass').value === "1234") {
+                sD = n; document.getElementById('secLog').style.display = 'none';
+                document.getElementById('secMain').style.display = 'block';
+                db.ref('settings/availableDays').on('value', s => {
+                    const c = document.getElementById('daysList'); c.innerHTML = "";
+                    s.forEach(d => c.innerHTML += `<button class="btn-action" style="background:var(--accent); margin:3px;" onclick="loadSecA('${d.val()}')">${d.val()}</button>`);
+                });
+            }
+        }
+
+        function loadSecA(date) {
+            document.getElementById('secTitle').innerText = "مواعيد " + date;
+            db.ref('appointments').on('value', s => {
+                const tb = document.getElementById('secT'); tb.innerHTML = "";
+                s.forEach(c => { if(c.val().doctorName === sD && c.val().date === date) {
+                    tb.innerHTML += `<tr><td>${c.val().patientName}</td><td>${c.val().address}</td>
+                    <td><button class="btn-action" style="background:var(--danger)" onclick="delApp('${c.key}')">حذف</button></td></tr>`;
+                }});
+            });
+        }
+
+        function addDay() { const d = document.getElementById('newDate').value; if(d) db.ref('settings/availableDays').push(d); }
+        function delApp(id) { if(confirm("حذف؟")) db.ref('appointments/'+id).remove(); }
+
+        // --- الصيدلية ---
+        function phLogin() {
+            const n = document.getElementById('phN').value;
+            const p = document.getElementById('phP').value;
+            db.ref('hospital/pharmacies/'+n).once('value', s => {
+                if(s.val() && s.val().password === p) {
+                    document.getElementById('phLog').style.display = 'none';
+                    document.getElementById('phMain').style.display = 'block';
+                    document.getElementById('phTitle').innerText = "صيدلية: " + n;
+                    db.ref('pharmacy_orders/'+n).on('value', orders => {
+                        const c = document.getElementById('phList'); c.innerHTML = "";
+                        orders.forEach(o => {
+                            c.innerHTML += `<div class="order-card"><b>${o.val().patientName}</b><br><small>من د. ${o.val().doctorName}</small>
+                            <p>${o.val().prescription}</p><button class="btn-action" style="background:var(--success)" onclick="finPh('${n}','${o.key}')">تم التسليم</button></div>`;
+                        });
+                    });
+                }
+            });
+        }
+        function finPh(ph, id) { db.ref('pharmacy_orders/'+ph+'/'+id).remove(); }
+
+    </script>
+</body>
+</html>
